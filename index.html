@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chapter 18 - The Savage And The Hunter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050505;
+            color: #e2e8f0;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Custom Scrollbar for HUD menus */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ef4444;
+            border-radius: 3px;
+        }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(10, 15, 26, 0.82);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7);
+        }
+
+        .glass-panel-gold {
+            background: rgba(20, 16, 10, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(234, 179, 8, 0.15);
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(239, 68, 68, 0.8);
+        }
+        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
+        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
+
+        /* Minimap canvas */
+        #minimapCanvas {
+            border: 2px solid rgba(239, 68, 68, 0.5);
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.85);
+        }
+
+        /* Touch Controls for mobile */
+        .touch-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            backdrop-filter: blur(4px);
+            active: background 0.2s;
+        }
+        .touch-btn:active {
+            background: rgba(239, 68, 68, 0.6);
+        }
+
+        /* Glow effects */
+        .glow-red {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+        }
+        .glow-gold {
+            text-shadow: 0 0 10px rgba(234, 179, 8, 0.8);
+        }
+    </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden bg-black">
+
+    <!-- 3D Canvas Container -->
+    <div id="game-container" class="absolute inset-0 w-full h-full z-0"></div>
+
+    <!-- FPS Crosshair -->
+    <div id="crosshair" class="hidden"></div>
+
+    <!-- TOP HUD BAR -->
+    <div id="hud-top" class="absolute top-4 left-4 right-4 z-10 flex flex-wrap justify-between items-start pointer-events-none gap-4">
+        <!-- Player Stats Frame -->
+        <div class="glass-panel p-4 rounded-xl flex items-center gap-4 pointer-events-auto min-w-[280px]">
+            <div class="relative">
+                <div id="player-avatar" class="w-14 h-14 rounded-lg bg-red-950 border-2 border-red-500 flex items-center justify-center text-red-400 font-bold text-2xl font-orbitron shadow-lg">
+                    AG
+                </div>
+                <div id="player-level" class="absolute -bottom-2 -right-2 bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded-full font-orbitron shadow">
+                    LV.1
+                </div>
+            </div>
+            <div class="flex-1">
+                <div class="flex justify-between items-center mb-1">
+                    <span id="player-name" class="font-orbitron font-bold text-white text-base tracking-wider glow-red">AGLIO (Savage)</span>
+                    <span id="player-class-badge" class="text-xs bg-red-900/60 text-red-300 border border-red-600/40 px-2 py-0.5 rounded uppercase">Berserker</span>
+                </div>
+                <!-- HP Bar -->
+                <div class="w-full bg-gray-950 rounded-full h-3.5 mb-1.5 p-0.5 border border-red-900/50 relative overflow-hidden">
+                    <div id="hp-bar" class="bg-gradient-to-r from-red-700 to-red-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                    <span id="hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white tracking-widest drop-shadow">100 / 100 HP</span>
+                </div>
+                <!-- MP / Rage Bar -->
+                <div class="w-full bg-gray-950 rounded-full h-2.5 p-0.5 border border-blue-900/50 relative overflow-hidden">
+                    <div id="mp-bar" class="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                    <span id="mp-text" class="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white tracking-widest drop-shadow">50 / 50 RAGE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quest Objectives Widget -->
+        <div class="glass-panel p-3 rounded-xl pointer-events-auto max-w-sm w-full border-l-4 border-l-red-500">
+            <div class="flex items-center justify-between border-b border-red-900/40 pb-1 mb-2">
+                <span class="text-xs font-orbitron text-red-400 uppercase tracking-widest flex items-center gap-1.5 font-bold">
+                    <i class="fa-solid fa-crosshairs"></i> Active Mission
+                </span>
+                <span id="quest-phase" class="text-[10px] bg-red-950 text-red-300 px-2 py-0.5 rounded border border-red-800">MAIN QUEST</span>
+            </div>
+            <h4 id="quest-title" class="font-bold text-white text-sm mb-1 font-orbitron">Chapter 18: Uncover Betrayal</h4>
+            <p id="quest-desc" class="text-xs text-gray-300 leading-relaxed mb-2">Investigate Conda's sudden disappearance and locate the underground tunnel guide.</p>
+            <div class="w-full bg-black/50 rounded-full h-2 overflow-hidden border border-gray-800">
+                <div id="quest-progress-bar" class="bg-yellow-500 h-full w-0 transition-all duration-500"></div>
+            </div>
+        </div>
+
+        <!-- Minimap & Quick Actions -->
+        <div class="glass-panel p-2 rounded-xl pointer-events-auto flex flex-col items-center gap-2">
+            <canvas id="minimapCanvas" width="110" height="110"></canvas>
+            <div class="flex gap-1 w-full justify-center">
+                <button id="btn-camera-toggle" class="bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded text-gray-300 border border-slate-600 flex items-center gap-1">
+                    <i class="fa-solid fa-camera"></i> <span id="cam-mode-text">3rd Person</span>
+                </button>
+                <button id="btn-story-modal" class="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded text-red-200 border border-red-700 flex items-center gap-1">
+                    <i class="fa-solid fa-book-open"></i> Lore
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM HUD - ACTION BAR & SKILLS -->
+    <div id="hud-bottom" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 pointer-events-auto">
+        <!-- Notification Banner -->
+        <div id="game-toast" class="opacity-0 transition-opacity duration-300 bg-red-950/90 border border-red-500 text-white text-xs px-4 py-1.5 rounded-full font-orbitron shadow-lg tracking-wide flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-yellow-400"></i> <span id="toast-message">Objective Updated</span>
+        </div>
+
+        <!-- Hotbar / Skill Buttons -->
+        <div class="glass-panel p-2 rounded-2xl flex items-center gap-3 border border-red-900/50">
+            <!-- Skill 1 -->
+            <button id="skill-1-btn" onclick="useSkill(1)" class="relative w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center hover:border-red-500 transition group">
+                <i class="fa-solid fa-person-running text-red-400 text-lg group-hover:scale-110 transition-transform"></i>
+                <span class="text-[9px] text-gray-400 mt-0.5">Strike (1)</span>
+                <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold px-1 rounded-full">Q</span>
+            </button>
+            <!-- Skill 2 -->
+            <button id="skill-2-btn" onclick="useSkill(2)" class="relative w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center hover:border-red-500 transition group">
+                <i class="fa-solid fa-fire text-amber-500 text-lg group-hover:scale-110 transition-transform"></i>
+                <span class="text-[9px] text-gray-400 mt-0.5">Rage (2)</span>
+                <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold px-1 rounded-full">E</span>
+            </button>
+            <!-- Basic Attack -->
+            <button id="attack-btn" onclick="performAttack()" class="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 border-2 border-red-400 flex flex-col items-center justify-center shadow-lg hover:brightness-125 transition active:scale-95">
+                <i class="fa-solid fa-hand-fist text-white text-xl"></i>
+                <span class="text-[10px] text-white font-bold font-orbitron">ATTACK</span>
+                <span class="absolute -top-1 -right-1 bg-yellow-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">L-CLK / SPACE</span>
+            </button>
+            <!-- Potion Item -->
+            <button id="item-heal-btn" onclick="useHealthPotion()" class="relative w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center hover:border-green-500 transition group">
+                <i class="fa-solid fa-notes-medical text-green-400 text-lg group-hover:scale-110 transition-transform"></i>
+                <span id="potion-count" class="text-[9px] text-gray-300 mt-0.5">Pot (3)</span>
+                <span class="absolute -top-1 -right-1 bg-green-600 text-white text-[9px] font-bold px-1 rounded-full">R</span>
+            </button>
+            <!-- Menu Navigation Buttons -->
+            <div class="h-8 w-px bg-gray-800 mx-1"></div>
+            <button onclick="toggleMenu('inventory')" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-gray-300 hover:text-white hover:border-red-500" title="Inventory (I)">
+                <i class="fa-solid fa-briefcase"></i>
+            </button>
+            <button onclick="toggleMenu('skills')" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-gray-300 hover:text-white hover:border-red-500" title="Skill Tree (K)">
+                <i class="fa-solid fa-network-wired"></i>
+            </button>
+            <button onclick="toggleMenu('stats')" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-gray-300 hover:text-white hover:border-red-500" title="Character Stats (C)">
+                <i class="fa-solid fa-user-shield"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MOBILE VIRTUAL TOUCH CONTROLS -->
+    <div id="touch-controls" class="absolute inset-x-4 bottom-20 z-10 flex justify-between pointer-events-none md:hidden">
+        <!-- Virtual D-Pad -->
+        <div class="relative w-36 h-36 pointer-events-auto">
+            <button ontouchstart="touchMove('up')" ontouchend="touchStop()" class="touch-btn absolute top-0 left-12 w-12 h-12 rounded-t-xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-up"></i></button>
+            <button ontouchstart="touchMove('left')" ontouchend="touchStop()" class="touch-btn absolute top-12 left-0 w-12 h-12 rounded-l-xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-left"></i></button>
+            <button ontouchstart="touchMove('right')" ontouchend="touchStop()" class="touch-btn absolute top-12 right-0 w-12 h-12 rounded-r-xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-right"></i></button>
+            <button ontouchstart="touchMove('down')" ontouchend="touchStop()" class="touch-btn absolute bottom-0 left-12 w-12 h-12 rounded-b-xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-down"></i></button>
+        </div>
+    </div>
+
+    <!-- MODAL / MENU POPUPS CONTAINER -->
+    <div id="modal-container" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+
+        <!-- INVENTORY MENU -->
+        <div id="menu-inventory" class="menu-panel hidden glass-panel w-full max-w-2xl rounded-2xl p-6 border-red-500/40">
+            <div class="flex justify-between items-center border-b border-red-900/50 pb-3 mb-4">
+                <h3 class="text-xl font-orbitron font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-briefcase text-red-500"></i> Savage Armory & Inventory
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="text-xs font-orbitron text-red-400 mb-2 uppercase">Equipped Gear</h4>
+                    <div class="space-y-2">
+                        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-wand-magic-sparkles text-red-400 text-xl"></i>
+                                <div>
+                                    <div id="equipped-weapon-name" class="text-sm font-bold text-white">Savage Machete Blade</div>
+                                    <div class="text-[11px] text-gray-400">Weapon (+15 ATK)</div>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-red-950 text-red-300 border border-red-800 px-2 py-0.5 rounded">Equipped</span>
+                        </div>
+                        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-shield-halved text-blue-400 text-xl"></i>
+                                <div>
+                                    <div id="equipped-armor-name" class="text-sm font-bold text-white">Rebel Tactical Vest</div>
+                                    <div class="text-[11px] text-gray-400 font-sans">Armor (+10 DEF)</div>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-blue-950 text-blue-300 border border-blue-800 px-2 py-0.5 rounded">Equipped</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-xs font-orbitron text-red-400 mb-2 uppercase">Item Bag</h4>
+                    <div id="inventory-grid" class="grid grid-cols-3 gap-2">
+                        <!-- Inventory slots dynamically rendered -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHARACTER STATS MENU -->
+        <div id="menu-stats" class="menu-panel hidden glass-panel w-full max-w-lg rounded-2xl p-6 border-red-500/40">
+            <div class="flex justify-between items-center border-b border-red-900/50 pb-3 mb-4">
+                <h3 class="text-xl font-orbitron font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield text-yellow-500"></i> Mercenary Attributes
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 bg-slate-900/60 rounded-xl">
+                    <span class="text-sm text-gray-300 font-orbitron">Available Stat Points:</span>
+                    <span id="stat-points" class="text-lg font-bold text-yellow-400">0</span>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-2 bg-slate-900/30 rounded-lg">
+                        <span class="text-xs font-bold text-gray-300"><i class="fa-solid fa-heart text-red-500 mr-2"></i> Health (HP)</span>
+                        <div class="flex items-center gap-3">
+                            <span id="stat-hp-val" class="text-sm font-bold text-white">100</span>
+                            <button onclick="addStat('hp')" class="bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-xs">+</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 bg-slate-900/30 rounded-lg">
+                        <span class="text-xs font-bold text-gray-300"><i class="fa-solid fa-bolt text-yellow-500 mr-2"></i> Attack (ATK)</span>
+                        <div class="flex items-center gap-3">
+                            <span id="stat-atk-val" class="text-sm font-bold text-white">25</span>
+                            <button onclick="addStat('atk')" class="bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-xs">+</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 bg-slate-900/30 rounded-lg">
+                        <span class="text-xs font-bold text-gray-300"><i class="fa-solid fa-shield text-blue-500 mr-2"></i> Defense (DEF)</span>
+                        <div class="flex items-center gap-3">
+                            <span id="stat-def-val" class="text-sm font-bold text-white">12</span>
+                            <button onclick="addStat('def')" class="bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-xs">+</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 bg-slate-900/30 rounded-lg">
+                        <span class="text-xs font-bold text-gray-300"><i class="fa-solid fa-gauge-high text-green-500 mr-2"></i> Speed (SPD)</span>
+                        <div class="flex items-center gap-3">
+                            <span id="stat-spd-val" class="text-sm font-bold text-white">10</span>
+                            <button onclick="addStat('spd')" class="bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-xs">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SKILL TREE MENU -->
+        <div id="menu-skills" class="menu-panel hidden glass-panel w-full max-w-xl rounded-2xl p-6 border-red-500/40">
+            <div class="flex justify-between items-center border-b border-red-900/50 pb-3 mb-4">
+                <h3 class="text-xl font-orbitron font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-network-wired text-red-500"></i> Savage Tactics Tree
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="skills-list" class="space-y-3">
+                <!-- Skill nodes dynamically rendered -->
+            </div>
+        </div>
+
+        <!-- STORY & MORAL LORE MODAL -->
+        <div id="menu-story" class="menu-panel hidden glass-panel-gold w-full max-w-2xl rounded-2xl p-6 max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-yellow-700/50 pb-3 mb-4">
+                <div>
+                    <span class="text-xs font-orbitron text-yellow-500 uppercase">February 15, 2020 • Risky Soldier's Death</span>
+                    <h2 class="text-2xl font-orbitron font-black text-amber-200">Chapter 18: Bedtime Stories</h2>
+                    <h3 class="text-lg font-orbitron text-yellow-500 font-bold">The Savage And The Hunter</h3>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4 text-sm text-gray-200 leading-relaxed font-sans">
+                <p class="italic text-yellow-200/90 border-l-2 border-yellow-500 pl-3 py-1">
+                    "From the creations of Risky Soldier’s Death And 'The Rages Band'"
+                </p>
+                <p>
+                    Once upon the felling drop of blood has the warfare on battle. The battle during World War X is collide with 2 mercenaries. Their names is <strong>Aglio</strong> and <strong>Conda</strong>. Those two friends there are joining forces to defeat the master mind who is <strong>Egoy</strong> and his Hunters.
+                </p>
+                <p>
+                    Before the World War X exists, Aglio wants to join forces with the savage. And Conda wants to be the hunter. So Conda join forces to Egoy’s clan. Aglio now is wondering why Conda isn’t back anymore. But the denial of truth is that Conda is join forces for Egoy’s clan. Because Egoy is rich somewhat he killed innocent people because he needs money to live and to eat many.
+                </p>
+                <p>
+                    So Conda join it and killed more innocent people to make his money grow faster. And when Aglio figure it out Aglio wants to betrays Conda. Because Conda has now in the evil side of Egoy’s clan. So Aglio the Savage named the war called "World War X" — meaning the betrayer must been finished to stop the war.
+                </p>
+                <p>
+                    So as Aglio mercenaries hire more soldiers, Egoy and Conda does too. They put the battle in an easy way. Hunters like Egoy and Conda just go with shotguns to slay Aglio and his co-allied soldiers. Aglio’s strategy is that he sums up the hidden tunnel underground, to kill easy as piece of cake the soldiers as they run.
+                </p>
+                <div class="p-4 bg-yellow-950/40 border border-yellow-600/50 rounded-xl mt-4">
+                    <h4 class="font-orbitron font-bold text-yellow-400 text-sm mb-1 uppercase tracking-wide">Moral Lesson</h4>
+                    <p class="text-xs text-yellow-100 italic">
+                        "Don’t betray the person who have just the way you must no have. Or else if you betrayed it, you’ll be a loser. Always be humble to choose the good over the pride for bad. Choose the friend you can believe to save the future than the bad stranger for bad."
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER / VICTORY MODAL -->
+        <div id="menu-gameover" class="menu-panel hidden glass-panel w-full max-w-md rounded-2xl p-6 text-center border-red-500/50">
+            <div id="end-icon" class="text-5xl mb-3 text-red-500"><i class="fa-solid fa-skull"></i></div>
+            <h2 id="end-title" class="text-2xl font-orbitron font-black text-white mb-2">AGLIO WAS DEFEATED</h2>
+            <p id="end-desc" class="text-xs text-gray-300 mb-4">Egoy and Conda's hunters overwhelmed your squad. World War X continues in darkness...</p>
+            <div id="victory-moral" class="hidden p-3 bg-yellow-950/40 border border-yellow-500/40 rounded-xl text-left text-xs text-yellow-200 mb-4">
+                <strong>Moral Lesson:</strong> Always be humble to choose the good over the pride for bad. Choose the friend you can believe to save the future.
+            </div>
+            <button onclick="restartGame()" class="w-full bg-gradient-to-r from-red-600 to-red-800 text-white font-orbitron font-bold py-2.5 rounded-xl hover:brightness-110 shadow-lg">
+                RESTART CHAPTER 18
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // GLOBAL GAME STATE
+        const gameState = {
+            player: {
+                name: "Aglio",
+                title: "The Savage",
+                class: "Berserker",
+                level: 1,
+                xp: 0,
+                nextXp: 100,
+                hp: 100,
+                maxHp: 100,
+                rage: 50,
+                maxRage: 50,
+                atk: 25,
+                def: 12,
+                spd: 10,
+                statPoints: 3,
+                potions: 3,
+                skills: {
+                    strike: { unlocked: true, level: 1 },
+                    rageWar: { unlocked: false, level: 0 },
+                    tacticalShield: { unlocked: false, level: 0 }
+                }
+            },
+            currentQuestIndex: 0,
+            quests: [
+                {
+                    id: 1,
+                    title: "Chapter 18: Uncover Betrayal",
+                    desc: "Find the Underground Tunnel Guide NPC in the rebel encampment to plan the attack against Conda & Egoy.",
+                    targetType: "npc",
+                    targetId: "guide",
+                    current: 0,
+                    total: 1,
+                    completed: false
+                },
+                {
+                    id: 2,
+                    title: "Infiltrate Hunters Underground",
+                    desc: "Navigate through the underground tunnel network and eliminate 4 Egoy Hunter Patrols.",
+                    targetType: "kill",
+                    targetId: "hunter",
+                    current: 0,
+                    total: 4,
+                    completed: false
+                },
+                {
+                    id: 3,
+                    title: "Defeat Betrayer Conda",
+                    desc: "Confront Conda in the inner fortress and defeat him to stop Egoy's money ring.",
+                    targetType: "boss",
+                    targetId: "conda",
+                    current: 0,
+                    total: 1,
+                    completed: false
+                },
+                {
+                    id: 4,
+                    title: "Slay Mastermind Egoy & Save Innocents",
+                    desc: "Eliminate Egoy and reach the villager rescue point to finish the betrayed war!",
+                    targetType: "boss",
+                    targetId: "egoy",
+                    current: 0,
+                    total: 1,
+                    completed: false
+                }
+            ],
+            inventory: [
+                { id: "blade_savage", name: "Savage Blade", type: "weapon", val: 15, desc: "Aglio's signature weapon." },
+                { id: "vest_rebel", name: "Rebel Armor", type: "armor", val: 10, desc: "Standard issue tactical gear." },
+                { id: "keycard_tunnel", name: "Tunnel Keycard", type: "quest", val: 0, desc: "Access code to Egoy's underground hideout." }
+            ],
+            cameraMode: '3P', // '3P' or '1P'
+            keys: {},
+            touchDirection: null
+        };
+
+        let scene, camera, renderer;
+        let playerMesh, playerBody;
+        let npcs = [], enemies = [], environmentObjects = [];
+        let clock = new THREE.Clock();
+
+        function init3D() {
+            const container = document.getElementById('game-container');
+            
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0e14);
+            scene.fog = new THREE.FogExp2(0x0b0e14, 0.025);
+
+            // Camera Setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xddeeff, 0.4);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+            dirLight.position.set(40, 60, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // Red atmosphere light for Egoy's warzone
+            const pointLight = new THREE.PointLight(0xef4444, 1.5, 50);
+            pointLight.position.set(0, 5, 20);
+            scene.add(pointLight);
+
+            // Generate Environment Maps & Terrain
+            buildEnvironment();
+
+            // Spawn Character & Entities
+            spawnPlayer();
+            spawnNPCs();
+            spawnEnemies();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupInputListeners();
+
+            // Render loop
+            animate();
+        }
+
+        function buildEnvironment() {
+            // Main Terrain Ground
+            const groundGeo = new THREE.PlaneGeometry(200, 200, 32, 32);
+            const groundMat = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Underground Tunnel Mesh Structure (Represented as dark metallic arches)
+            const tunnelMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+            for (let i = -30; i <= 30; i += 10) {
+                const archGeo = new THREE.TorusGeometry(6, 0.5, 8, 16, Math.PI);
+                const arch = new THREE.Mesh(archGeo, tunnelMat);
+                arch.position.set(0, 0, i);
+                arch.rotation.x = Math.PI;
+                scene.add(arch);
+            }
+
+            // Egoy's Fortress / Base Outpost Structures
+            const fortressGeo = new THREE.BoxGeometry(16, 8, 16);
+            const fortressMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5 });
+            const fortress = new THREE.Mesh(fortressGeo, fortressMat);
+            fortress.position.set(30, 4, -40);
+            fortress.castShadow = true;
+            scene.add(fortress);
+
+            // Rescue Village Huts
+            for (let i = 0; i < 3; i++) {
+                const hutGeo = new THREE.ConeGeometry(3, 4, 4);
+                const hutMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+                const hut = new THREE.Mesh(hutGeo, hutMat);
+                hut.position.set(-35 + (i * 8), 2, -30);
+                scene.add(hut);
+            }
+
+            // Decorative crates/barrels
+            const crateGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            const crateMat = new THREE.MeshStandardMaterial({ color: 0x854d0e });
+            for (let i = 0; i < 10; i++) {
+                const crate = new THREE.Mesh(crateGeo, crateMat);
+                crate.position.set((Math.random() - 0.5) * 60, 0.75, (Math.random() - 0.5) * 60);
+                scene.add(crate);
+            }
+        }
+
+        function spawnPlayer() {
+            const playerGroup = new THREE.Group();
+
+            // Body
+            const bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 }); // Aglio Savage Amber Armor
+            playerBody = new THREE.Mesh(bodyGeo, bodyMat);
+            playerBody.position.y = 0.9;
+            playerBody.castShadow = true;
+            playerGroup.add(playerBody);
+
+            // Head
+            const headGeo = new THREE.SphereGeometry(0.35, 8, 8);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xfca5a5 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.0;
+            playerGroup.add(head);
+
+            // Savage Blade
+            const bladeGeo = new THREE.BoxGeometry(0.1, 1.4, 0.2);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8, roughness: 0.2 });
+            const blade = new THREE.Mesh(bladeGeo, bladeMat);
+            blade.position.set(0.6, 1.1, 0.3);
+            blade.rotation.x = Math.PI / 4;
+            playerGroup.add(blade);
+
+            playerMesh = playerGroup;
+            playerMesh.position.set(0, 0, 35); // Start at safe spawn point
+            scene.add(playerMesh);
+        }
+
+        function spawnNPCs() {
+            // Tunnel Guide NPC
+            const guideGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 8);
+            const guideMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+            const guide = new THREE.Mesh(guideGeo, guideMat);
+            guide.position.set(5, 0.9, 25);
+            guide.userData = { id: "guide", name: "Tunnel Guide", type: "npc" };
+            scene.add(guide);
+            npcs.push(guide);
+
+            // Innocent Villagers to Rescue
+            for (let i = 0; i < 3; i++) {
+                const vilGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8);
+                const vilMat = new THREE.MeshStandardMaterial({ color: 0x16a34a });
+                const villager = new THREE.Mesh(vilGeo, vilMat);
+                villager.position.set(-35 + (i * 4), 0.75, -25);
+                villager.userData = { id: `villager_${i}`, name: "Innocent Villager", type: "npc" };
+                scene.add(villager);
+                npcs.push(villager);
+            }
+        }
+
+        function spawnEnemies() {
+            // Clear existing enemies
+            enemies.forEach(e => scene.remove(e.mesh));
+            enemies = [];
+
+            // Spawn 4 Egoy Hunter Patrols
+            for (let i = 0; i < 4; i++) {
+                createEnemyCharacter(`hunter_${i}`, "Egoy Hunter", 0xd97706, 60, 12, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 20);
+            }
+
+            // Spawn Mini-Boss CONDA
+            createEnemyCharacter("conda", "CONDA (Betrayer)", 0x9333ea, 200, 22, 10, -20, true);
+
+            // Spawn Final Boss EGOY
+            createEnemyCharacter("egoy", "EGOY (Mastermind)", 0xd97706, 350, 30, 30, -38, true);
+        }
+
+        function createEnemyCharacter(id, name, colorHex, maxHp, atk, x, z, isBoss = false) {
+            const group = new THREE.Group();
+            const scale = isBoss ? 1.4 : 1.0;
+
+            const bodyGeo = new THREE.CylinderGeometry(0.5 * scale, 0.5 * scale, 1.8 * scale, 8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = (1.8 * scale) / 2;
+            body.castShadow = true;
+            group.add(body);
+
+            // Shotgun mesh for Hunters
+            const gunGeo = new THREE.BoxGeometry(0.15, 0.15, 1.2 * scale);
+            const gunMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 });
+            const gun = new THREE.Mesh(gunGeo, gunMat);
+            gun.position.set(0.5 * scale, 1.0 * scale, 0.4 * scale);
+            group.add(gun);
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+
+            enemies.push({
+                id: id,
+                name: name,
+                mesh: group,
+                hp: maxHp,
+                maxHp: maxHp,
+                atk: atk,
+                isBoss: isBoss,
+                alive: true
+            });
+        }
+
+        function setupInputListeners() {
+            window.addEventListener('keydown', (e) => {
+                gameState.keys[e.key.toLowerCase()] = true;
+                if (e.key === '1' || e.key === 'q') useSkill(1);
+                if (e.key === '2' || e.key === 'e') useSkill(2);
+                if (e.key === ' ') performAttack();
+                if (e.key.toLowerCase() === 'r') useHealthPotion();
+                if (e.key.toLowerCase() === 'i') toggleMenu('inventory');
+                if (e.key.toLowerCase() === 'k') toggleMenu('skills');
+                if (e.key.toLowerCase() === 'c') toggleMenu('stats');
+            });
+
+            window.addEventListener('keyup', (e) => {
+                gameState.keys[e.key.toLowerCase()] = false;
+            });
+
+            document.getElementById('btn-camera-toggle').addEventListener('click', toggleCameraMode);
+            document.getElementById('btn-story-modal').addEventListener('click', () => toggleMenu('story'));
+        }
+
+        function touchMove(dir) {
+            gameState.touchDirection = dir;
+        }
+
+        function touchStop() {
+            gameState.touchDirection = null;
+        }
+
+        function toggleCameraMode() {
+            if (gameState.cameraMode === '3P') {
+                gameState.cameraMode = '1P';
+                document.getElementById('cam-mode-text').innerText = "1st Person";
+                document.getElementById('crosshair').classList.remove('hidden');
+            } else {
+                gameState.cameraMode = '3P';
+                document.getElementById('cam-mode-text').innerText = "3rd Person";
+                document.getElementById('crosshair').classList.add('hidden');
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            handlePlayerMovement(delta);
+            updateCameraPosition();
+            updateEnemiesAI(delta);
+            updateMinimap();
+
+            renderer.render(scene, camera);
+        }
+
+        function handlePlayerMovement(delta) {
+            if (!playerMesh) return;
+
+            const speed = (gameState.player.spd + 5) * delta;
+            let moveZ = 0;
+            let moveX = 0;
+
+            if (gameState.keys['w'] || gameState.keys['arrowup'] || gameState.touchDirection === 'up') moveZ -= 1;
+            if (gameState.keys['s'] || gameState.keys['arrowdown'] || gameState.touchDirection === 'down') moveZ += 1;
+            if (gameState.keys['a'] || gameState.keys['arrowleft'] || gameState.touchDirection === 'left') moveX -= 1;
+            if (gameState.keys['d'] || gameState.keys['arrowright'] || gameState.touchDirection === 'right') moveX += 1;
+
+            if (moveX !== 0 || moveZ !== 0) {
+                const angle = Math.atan2(moveX, moveZ);
+                playerMesh.rotation.y = angle;
+                playerMesh.translateZ(speed);
+
+                // Boundary Lock
+                playerMesh.position.x = Math.max(-90, Math.min(90, playerMesh.position.x));
+                playerMesh.position.z = Math.max(-90, Math.min(90, playerMesh.position.z));
+
+                checkNPCProximity();
+            }
+        }
+
+        function updateCameraPosition() {
+            if (gameState.cameraMode === '3P') {
+                camera.position.set(
+                    playerMesh.position.x,
+                    playerMesh.position.y + 7,
+                    playerMesh.position.z + 12
+                );
+                camera.lookAt(playerMesh.position.x, playerMesh.position.y + 1, playerMesh.position.z);
+            } else { // 1st Person Mode
+                camera.position.set(
+                    playerMesh.position.x,
+                    playerMesh.position.y + 1.8,
+                    playerMesh.position.z
+                );
+                const lookTarget = new THREE.Vector3(0, 0, -10).applyAxisAngle(new THREE.Vector3(0, 1, 0), playerMesh.rotation.y);
+                camera.lookAt(camera.position.clone().add(lookTarget));
+            }
+        }
+
+        function updateEnemiesAI(delta) {
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+
+                const dist = playerMesh.position.distanceTo(enemy.mesh.position);
+
+                // Enemy Aggro Range
+                if (dist < 15 && dist > 1.8) {
+                    enemy.mesh.lookAt(playerMesh.position.x, enemy.mesh.position.y, playerMesh.position.z);
+                    enemy.mesh.translateZ(3 * delta);
+                } else if (dist <= 1.8) {
+                    // Enemy Attacks Aglio
+                    if (Math.random() < 0.02) {
+                        const damage = Math.max(2, enemy.atk - gameState.player.def);
+                        gameState.player.hp = Math.max(0, gameState.player.hp - damage);
+                        updateHUD();
+                        showToast(`${enemy.name} hit you with Shotgun for ${damage} DMG!`);
+
+                        if (gameState.player.hp <= 0) {
+                            triggerGameOver(false);
+                        }
+                    }
+                }
+            });
+        }
+
+        function performAttack() {
+            let hitAny = false;
+
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+
+                const dist = playerMesh.position.distanceTo(enemy.mesh.position);
+                if (dist < 3.5) {
+                    hitAny = true;
+                    const dmg = gameState.player.atk + Math.floor(Math.random() * 8);
+                    enemy.hp -= dmg;
+
+                    showToast(`Savage Slash hit ${enemy.name} for ${dmg} DMG!`);
+
+                    if (enemy.hp <= 0) {
+                        enemy.alive = false;
+                        scene.remove(enemy.mesh);
+                        showToast(`Defeated ${enemy.name}! +50 XP`);
+                        gainXP(50);
+                        checkQuestProgress(enemy.id.includes('hunter') ? 'hunter' : enemy.id);
+                    }
+                }
+            });
+
+            if (!hitAny) {
+                showToast("Savage Swing missed!");
+            }
+        }
+
+        function useSkill(slot) {
+            if (slot === 1) { // Underground Strike
+                if (gameState.player.rage < 15) {
+                    showToast("Not enough Rage!");
+                    return;
+                }
+                gameState.player.rage -= 15;
+                updateHUD();
+                showToast("AGLIO used Underground Strike! (+30% DMG)");
+                
+                // Area of Effect attack
+                enemies.forEach(enemy => {
+                    if (enemy.alive && playerMesh.position.distanceTo(enemy.mesh.position) < 6) {
+                        const dmg = Math.floor(gameState.player.atk * 1.5);
+                        enemy.hp -= dmg;
+                        if (enemy.hp <= 0) {
+                            enemy.alive = false;
+                            scene.remove(enemy.mesh);
+                            gainXP(50);
+                            checkQuestProgress(enemy.id.includes('hunter') ? 'hunter' : enemy.id);
+                        }
+                    }
+                });
+            } else if (slot === 2) { // Rage War
+                if (!gameState.player.skills.rageWar.unlocked) {
+                    showToast("Skill locked! Unlock in Skill Tree (K)");
+                    return;
+                }
+                if (gameState.player.rage < 30) {
+                    showToast("Not enough Rage!");
+                    return;
+                }
+                gameState.player.rage -= 30;
+                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + 40);
+                updateHUD();
+                showToast("RAGE WAR ACTIVATED! Restored +40 HP!");
+            }
+        }
+
+        function useHealthPotion() {
+            if (gameState.player.potions > 0) {
+                gameState.player.potions--;
+                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + 50);
+                updateHUD();
+                showToast("Healed +50 HP using Health Potion!");
+            } else {
+                showToast("No health potions remaining!");
+            }
+        }
+
+        function checkNPCProximity() {
+            npcs.forEach(npc => {
+                if (playerMesh.position.distanceTo(npc.position) < 3) {
+                    if (npc.userData.id === "guide") {
+                        checkQuestProgress("guide");
+                    }
+                }
+            });
+        }
+
+        function checkQuestProgress(targetId) {
+            const currentQuest = gameState.quests[gameState.currentQuestIndex];
+            if (!currentQuest || currentQuest.completed) return;
+
+            if (currentQuest.targetId === targetId) {
+                currentQuest.current++;
+                if (currentQuest.current >= currentQuest.total) {
+                    currentQuest.completed = true;
+                    showToast(`MISSION COMPLETE: ${currentQuest.title}`);
+                    gainXP(100);
+
+                    // Advance quest
+                    if (gameState.currentQuestIndex < gameState.quests.length - 1) {
+                        gameState.currentQuestIndex++;
+                        updateQuestHUD();
+                    } else {
+                        // All main quests finished -> VICTORY!
+                        triggerGameOver(true);
+                    }
+                } else {
+                    updateQuestHUD();
+                }
+            }
+        }
+
+        function gainXP(amount) {
+            gameState.player.xp += amount;
+            if (gameState.player.xp >= gameState.player.nextXp) {
+                gameState.player.level++;
+                gameState.player.xp -= gameState.player.nextXp;
+                gameState.player.nextXp += 50;
+                gameState.player.statPoints += 2;
+                gameState.player.maxHp += 20;
+                gameState.player.hp = gameState.player.maxHp;
+                showToast(`LEVEL UP! Aglio reached LV. ${gameState.player.level}!`);
+            }
+            updateHUD();
+        }
+
+        function updateMinimap() {
+            const canvas = document.getElementById('minimapCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const scale = 1.2;
+
+            // Player Icon
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Enemies Radar Dots
+            enemies.forEach(e => {
+                if (!e.alive) return;
+                const dx = (e.mesh.position.x - playerMesh.position.x) * scale;
+                const dz = (e.mesh.position.z - playerMesh.position.z) * scale;
+
+                if (Math.abs(dx) < 50 && Math.abs(dz) < 50) {
+                    ctx.fillStyle = e.isBoss ? '#eab308' : '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(centerX + dx, centerY + dz, e.isBoss ? 5 : 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function updateHUD() {
+            document.getElementById('player-level').innerText = `LV.${gameState.player.level}`;
+            document.getElementById('hp-bar').style.width = `${(gameState.player.hp / gameState.player.maxHp) * 100}%`;
+            document.getElementById('hp-text').innerText = `${gameState.player.hp} / ${gameState.player.maxHp} HP`;
+            document.getElementById('mp-bar').style.width = `${(gameState.player.rage / gameState.player.maxRage) * 100}%`;
+            document.getElementById('mp-text').innerText = `${gameState.player.rage} / ${gameState.player.maxRage} RAGE`;
+            document.getElementById('potion-count').innerText = `Pot (${gameState.player.potions})`;
+            document.getElementById('stat-points').innerText = gameState.player.statPoints;
+            document.getElementById('stat-hp-val').innerText = gameState.player.maxHp;
+            document.getElementById('stat-atk-val').innerText = gameState.player.atk;
+            document.getElementById('stat-def-val').innerText = gameState.player.def;
+            document.getElementById('stat-spd-val').innerText = gameState.player.spd;
+        }
+
+        function updateQuestHUD() {
+            const q = gameState.quests[gameState.currentQuestIndex];
+            if (q) {
+                document.getElementById('quest-title').innerText = q.title;
+                document.getElementById('quest-desc').innerText = q.desc;
+                const pct = (q.current / q.total) * 100;
+                document.getElementById('quest-progress-bar').style.width = `${pct}%`;
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('game-toast');
+            document.getElementById('toast-message').innerText = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        function toggleMenu(menuName) {
+            const container = document.getElementById('modal-container');
+            const panels = document.querySelectorAll('.menu-panel');
+
+            panels.forEach(p => p.classList.add('hidden'));
+
+            if (menuName) {
+                container.classList.remove('hidden');
+                document.getElementById(`menu-${menuName}`).classList.remove('hidden');
+
+                if (menuName === 'inventory') renderInventory();
+                if (menuName === 'skills') renderSkillsTree();
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-container').classList.add('hidden');
+        }
+
+        function renderInventory() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = '';
+
+            gameState.inventory.forEach(item => {
+                const slot = document.createElement('div');
+                slot.className = 'p-2 bg-slate-900 border border-slate-700 rounded-lg flex flex-col items-center justify-center text-center';
+                slot.innerHTML = `
+                    <i class="fa-solid fa-box-open text-yellow-500 mb-1"></i>
+                    <span class="text-[11px] font-bold text-white">${item.name}</span>
+                    <span class="text-[9px] text-gray-400">${item.type}</span>
+                `;
+                grid.appendChild(slot);
+            });
+        }
+
+        function renderSkillsTree() {
+            const list = document.getElementById('skills-list');
+            list.innerHTML = `
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <div class="font-bold text-white text-sm">1. Underground Strike</div>
+                        <div class="text-xs text-gray-400">Dash beneath enemies & perform Savage AOE slash.</div>
+                    </div>
+                    <span class="text-xs bg-green-950 text-green-300 border border-green-700 px-2 py-0.5 rounded">UNLOCKED</span>
+                </div>
+                <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <div class="font-bold text-white text-sm">2. Rage War</div>
+                        <div class="text-xs text-gray-400">Channel Aglio's rage to restore +40 HP in battle.</div>
+                    </div>
+                    ${gameState.player.skills.rageWar.unlocked 
+                        ? `<span class="text-xs bg-green-950 text-green-300 border border-green-700 px-2 py-0.5 rounded">UNLOCKED</span>`
+                        : `<button onclick="unlockSkill('rageWar')" class="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded font-bold">Unlock (1 Point)</button>`
+                    }
+                </div>
+            `;
+        }
+
+        function unlockSkill(skillId) {
+            if (gameState.player.statPoints >= 1) {
+                gameState.player.statPoints--;
+                gameState.player.skills[skillId].unlocked = true;
+                updateHUD();
+                renderSkillsTree();
+                showToast("Skill Unlocked Successfully!");
+            } else {
+                showToast("Not enough Stat Points!");
+            }
+        }
+
+        function addStat(type) {
+            if (gameState.player.statPoints > 0) {
+                gameState.player.statPoints--;
+                if (type === 'hp') { gameState.player.maxHp += 25; gameState.player.hp += 25; }
+                if (type === 'atk') gameState.player.atk += 5;
+                if (type === 'def') gameState.player.def += 3;
+                if (type === 'spd') gameState.player.spd += 2;
+                updateHUD();
+            } else {
+                showToast("No Stat Points available!");
+            }
+        }
+
+        function triggerGameOver(isVictory) {
+            const modal = document.getElementById('modal-container');
+            const endPanel = document.getElementById('menu-gameover');
+            const panels = document.querySelectorAll('.menu-panel');
+
+            panels.forEach(p => p.classList.add('hidden'));
+            modal.classList.remove('hidden');
+            endPanel.classList.remove('hidden');
+
+            const icon = document.getElementById('end-icon');
+            const title = document.getElementById('end-title');
+            const desc = document.getElementById('end-desc');
+            const moral = document.getElementById('victory-moral');
+
+            if (isVictory) {
+                icon.innerHTML = `<i class="fa-solid fa-trophy text-yellow-400"></i>`;
+                title.innerText = "THE SAVAGE AND THE HUNTER";
+                title.className = "text-2xl font-orbitron font-black text-amber-400 mb-2 glow-gold";
+                desc.innerText = "Aglio successfully completed the underground tunnel ambush! Conda & Egoy were defeated, innocent people saved, and World War X was finished once and for all!";
+                moral.classList.remove('hidden');
+            } else {
+                icon.innerHTML = `<i class="fa-solid fa-skull text-red-500"></i>`;
+                title.innerText = "AGLIO WAS SLAIN";
+                title.className = "text-2xl font-orbitron font-black text-red-500 mb-2 glow-red";
+                desc.innerText = "Egoy and Conda's hunters overwhelmed your defenses. Upgrade your attributes and try again!";
+                moral.classList.add('hidden');
+            }
+        }
+
+        function restartGame() {
+            gameState.player.hp = gameState.player.maxHp;
+            gameState.player.rage = gameState.player.maxRage;
+            gameState.currentQuestIndex = 0;
+            gameState.quests.forEach(q => { q.current = 0; q.completed = false; });
+            
+            playerMesh.position.set(0, 0, 35);
+            spawnEnemies();
+            updateHUD();
+            updateQuestHUD();
+            closeModal();
+            showToast("Chapter 18 Restarted!");
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = function() {
+            init3D();
+            updateHUD();
+            updateQuestHUD();
+            showToast("Welcome to Chapter 18: The Savage And The Hunter");
+        };
+    </script>
+</body>
+</html>
